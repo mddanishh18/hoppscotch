@@ -71,20 +71,33 @@ import { importToPersonalWorkspace } from "./import"
 
 function initCollectionsSync() {
   const currentUser$ = platformAuth.getCurrentUserStream()
-  collectionsSyncer.startStoreSync()
+  let initialRESTLoad: Promise<void> | null = loadUserCollections("REST")
+
   collectionsSyncer.setupSubscriptions(setupSubscriptions)
 
   gqlCollectionsSyncer.startStoreSync()
 
+  const loadRESTCollections = () => {
+    if (!initialRESTLoad) {
+      initialRESTLoad = loadUserCollections("REST")
+    }
+
+    return initialRESTLoad
+  }
+
+  const loadGQLCollections = () => loadUserCollections("GQL")
+
   // TODO: fix collection schema transformation on backend maybe?
-  loadUserCollections("REST")
-  loadUserCollections("GQL")
+  ;(async () => {
+    await initialRESTLoad
+    collectionsSyncer.startStoreSync()
+  })()
 
   // TODO: test & make sure the auth thing is working properly
   currentUser$.subscribe(async (user) => {
     if (user) {
-      loadUserCollections("REST")
-      loadUserCollections("GQL")
+      loadRESTCollections()
+      loadGQLCollections()
     }
   })
 
